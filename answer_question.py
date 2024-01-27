@@ -5,6 +5,16 @@ from openai import OpenAI
 import numpy as np
 
 
+def read(file_path):
+    try:
+        with open(file_path, "r", encoding="utf-8") as file:
+            return file.read()
+    except FileNotFoundError:
+        return "The file was not found."
+    except Exception as e:
+        return f"An error occurred: {e}"
+
+
 def cosine_similarity(a, b):
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
@@ -38,15 +48,18 @@ def create_context(client, question, df, max_len, model):
 
 def main(
     embedding_csv,
+    system_instruct_path,
     model="gpt-3.5-turbo",
-    question="I am looking for a credit card. ",
+    question="I am looking for a credit card.",
+    additional_context="",
     embed_model="text-embedding-3-small",
-    max_len=1500,
+    max_len=1000,
     debug=True,
-    max_tokens=1500,
+    max_tokens=500,
     stop_sequence=None,
 ):
     df = read_embedding_csv(embedding_csv)
+    system_instruct = read(system_instruct_path)
     client = OpenAI(
         api_key=os.environ.get("OPENAI_API_KEY"),
     )
@@ -58,18 +71,21 @@ def main(
         model=embed_model,
     )
     if debug:
-        print(f"Context: {context}\n\n---\n\nQuestion: {question}\nAnswer:")
+        print(system_instruct)
+        print(
+            f"Context: {context}\n\n---\n\n--{additional_context}\n\nQuestion: {question}\nAnswer:"
+        )
     try:
         response = client.chat.completions.create(
             model=model,
             messages=[
                 {
                     "role": "system",
-                    "content": "Answer the question based on the context below, and if the question can't be answered based on the context, say \"I don't know\"\n\n",
+                    "content": system_instruct,
                 },
                 {
                     "role": "user",
-                    "content": f"Context: {context}\n\n---\n\nQuestion: {question}\nAnswer:",
+                    "content": f"Context: {context}\n\n---\n\n--{additional_context}\n\nQuestion: {question}\nAnswer:",
                 },
             ],
             temperature=0,
@@ -79,7 +95,7 @@ def main(
             presence_penalty=0,
             stop=stop_sequence,
         )
-        return response.choices[0].message.content
+        return response
     except Exception as e:
         print(e)
         return ""
@@ -90,6 +106,13 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--embedding_csv", type=str, help="Absoluate pth to the embedding csv"
+    )
+
+    parser.add_argument(
+        "--system_instruct_path",
+        type=str,
+        default="system_instruct.txt",
+        help="Absoluate pth to the system_instruct",
     )
 
     parser.add_argument(
@@ -117,8 +140,10 @@ if __name__ == "__main__":
 
     resp = main(
         args.embedding_csv,
+        args.system_instruct_path,
         args.chat_model,
         args.question,
+        args.additional_context,
         args.embed_model,
     )
 
