@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name="spencer",
     version="0.1",
-    packages=find_packages(),
+    packages=['spencer'],
     install_requires=[
         "openai==1.10.0",
         "tiktoken==0.5.2",
