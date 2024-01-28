@@ -73,7 +73,7 @@ def main(
     if debug:
         print(system_instruct)
         print(
-            f"Context: {context}\n\n---\n\n--{additional_context}\n\nQuestion: {question}\nAnswer:"
+            f"Context: {context}\n\n---\n\n{additional_context}\n\nQuestion: {question}\nAnswer:"
         )
     try:
         response = client.chat.completions.create(
@@ -85,7 +85,7 @@ def main(
                 },
                 {
                     "role": "user",
-                    "content": f"Context: {context}\n\n---\n\n--{additional_context}\n\nQuestion: {question}\nAnswer:",
+                    "content": f"Context: {context}\n\n---\n\n{additional_context}\n\nQuestion: {question}\nAnswer:",
                 },
             ],
             temperature=0,
