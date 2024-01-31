@@ -57,28 +57,23 @@ def main(
     debug=True,
     max_tokens=500,
     stop_sequence=None,
+    conversions=[],
 ):
     df = read_embedding_csv(embedding_csv)
     system_instruct = read(system_instruct_path)
     client = OpenAI(
         api_key=os.environ.get("OPENAI_API_KEY"),
     )
-    context = create_context(
-        client,
-        question,
-        df,
-        max_len=max_len,
-        model=embed_model,
-    )
-    if debug:
-        print(system_instruct)
-        print(
-            f"Context: {context}\n\n---\n\n{additional_context}\n\nQuestion: {question}\nAnswer:"
-        )
     try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
+        if len(conversions) == 0:
+            context = create_context(
+                client,
+                question,
+                df,
+                max_len=max_len,
+                model=embed_model,
+            )
+            conversions = [
                 {
                     "role": "system",
                     "content": system_instruct,
@@ -87,7 +82,19 @@ def main(
                     "role": "user",
                     "content": f"Context: {context}\n\n---\n\n{additional_context}\n\nQuestion: {question}\nAnswer:",
                 },
-            ],
+            ]
+            if debug:
+                print(system_instruct)
+                print(
+                    f"Context: {context}\n\n---\n\n{additional_context}\n\nQuestion: {question}\nAnswer:"
+                )
+        else:
+            if debug:
+                print(conversions)
+
+        response = client.chat.completions.create(
+            model=model,
+            messages=conversions,
             temperature=0,
             max_tokens=max_tokens,
             top_p=1,
@@ -95,7 +102,7 @@ def main(
             presence_penalty=0,
             stop=stop_sequence,
         )
-        return response
+        return response, conversions
     except Exception as e:
         print(e)
         return ""
