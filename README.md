@@ -1,12 +1,19 @@
 # spencer
 based on https://platform.openai.com/docs/tutorials/web-qa-embeddings
 based on https://redis.io/docs/get-started/vector-database/
+
+
 # install
 - naviage to this folder
 - `pip install .`
 - `import spencer`
 - `spencer.create_embedding.main`
 - `spencer.answer_question.main`
+
+# redis
+- https://hub.docker.com/r/redis/redis-stack-server/
+- `docker pull redis/redis-stack-server`
+- `docker run -d --name redis-stack -p 6379:6379 redis/redis-stack-server:latest`
 
 # how to create embedding?
 1. set openai api key by `export OPENAI_API_KEY=abc`

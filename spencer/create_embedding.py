@@ -1,5 +1,4 @@
 import argparse
-import pandas as pd
 import tiktoken
 import os
 import base64
