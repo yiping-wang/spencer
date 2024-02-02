@@ -2,110 +2,168 @@ import argparse
 import pandas as pd
 import tiktoken
 import os
+import base64
+import redis
 from openai import OpenAI
+import datetime
+
+EMBEDDING_DIM = 1536
 
 
-max_tokens = 500
+def encode(file_path):
+    with open(file_path, "rb") as file:
+        binary_content = file.read()
+        return base64.b64encode(binary_content)
 
 
-def remove_newlines(serie):
-    serie = serie.str.replace("\n", " ")
-    serie = serie.str.replace("\\n", " ")
-    serie = serie.str.replace("  ", " ")
-    serie = serie.str.replace("  ", " ")
-    return serie
+def remove_newlines(s):
+    s = s.replace("\n", " ")
+    s = s.replace("\\n", " ")
+    s = s.replace("  ", " ")
+    s = s.replace("  ", " ")
+    return s
 
 
-def text2df(text_dir):
-    texts = []
-
-    for file in os.listdir(text_dir):
-        try:
-            with open(os.path.join(text_dir, file), "r", encoding="UTF-8") as f:
-                text = f.read()
-                texts.append(
-                    (file.replace("-", " ").replace("_", " ").replace("#update", ""), text)
-                )
-        except UnicodeDecodeError:
+def find_knowledge_to_embed(redis_client, knowledge_dir):
+    knowledge_loc = {}
+    for file in os.listdir(knowledge_dir):
+        file_path = os.path.join(knowledge_dir, file)
+        encoding = encode(file_path)
+        id = file_path + ":hash"
+        prev_encoding = redis_client.get(id)
+        if prev_encoding == encoding:
             continue
-    df = pd.DataFrame(texts, columns=["fname", "text"])
+        redis_client.set(id, encoding)
+        knowledge_loc[file] = file_path
+    return knowledge_loc
 
-    df["text"] = df.fname + ". " + remove_newlines(df.text)
 
+def break_knowledge(
+    file_name, file_path, knowledge_id, model, openai_client, redis_pipeline, max_tokens
+):
+    file_name = file_name.replace("-", " ").replace("_", " ").replace("#update", "")
+    print(file_path)
+    with open(file_path, "r", encoding="UTF-8") as f:
+        text = f.read()
+    text = remove_newlines(text)
     tokenizer = tiktoken.get_encoding("cl100k_base")
+    n_tokens = len(tokenizer.encode(text))
 
-    df["n_tokens"] = df.text.apply(lambda x: len(tokenizer.encode(x)))
-    return df
+    if n_tokens > max_tokens:
+        chunks, knowledge_id = split_into_many(
+            knowledge_id, text, model, openai_client, max_tokens
+        )
+        for i, chunk in chunks.items():
+            chunk["file_name"] = file_name
+            chunk["file_path"] = file_path
+            chunk["last_modified_time"] = datetime.datetime.fromtimestamp(
+                os.path.getmtime(file_path)
+            ).strftime("%Y-%m-%d %H:%M:%S")
+            redis_key = f"knowledge:{i:05}"
+            redis_pipeline.json().set(redis_key, "$", chunk)
+    else:
+        chunk = {
+            "file_name": file_name,
+            "file_path": file_path,
+            "last_modified_time": datetime.datetime.fromtimestamp(
+                os.path.getmtime(file_path)
+            ).strftime("%Y-%m-%d %H:%M:%S"),
+            "n_tokens": len(tokenizer.encode(text)),
+            "chunk_id": 0,
+            "description": text,
+            "description_embedding": openai_client.embeddings.create(
+                input=[text.replace("\n", " ")], model=model
+            )
+            .data[0]
+            .embedding,
+        }
+        redis_key = f"knowledge:{knowledge_id:05}"
+        redis_pipeline.json().set(redis_key, "$", chunk)
+        knowledge_id += 1
+
+    return knowledge_id
 
 
-def split_into_many(text, max_tokens=500):
+def split_into_many(knowledge_id, text, model, openai_client, max_tokens):
     sentences = text.split(". ")
     tokenizer = tiktoken.get_encoding("cl100k_base")
     n_tokens = [len(tokenizer.encode(" " + sentence)) for sentence in sentences]
 
-    chunks = []
+    chunks = {}
+    chunk_id = 0
     tokens_so_far = 0
     chunk = []
 
-    for sentence, token in zip(sentences, n_tokens):
-        if tokens_so_far + token > max_tokens:
-            chunk_join = ". ".join(chunk) + "."
-            chunks.append([chunk_join, len(tokenizer.encode(chunk_join))])
+    for sentence, n_token in zip(sentences, n_tokens):
+        if tokens_so_far + n_token > max_tokens:
+            cur_sentence = ". ".join(chunk) + "."
             chunk = []
             tokens_so_far = 0
+            chunks[knowledge_id] = {
+                "n_tokens": len(tokenizer.encode(cur_sentence)),
+                "chunk_id": chunk_id,
+                "description": cur_sentence,
+                "description_embedding": openai_client.embeddings.create(
+                    input=[sentence.replace("\n", " ")], model=model
+                )
+                .data[0]
+                .embedding,
+            }
+            chunk_id += 1
+            knowledge_id += 1
 
-        if token > max_tokens:
-            continue
+        # still want that knowledge even if it is too big
+        if n_token > max_tokens:
+            chunks[knowledge_id] = {
+                "n_tokens": len(tokenizer.encode(sentence)),
+                "chunk_id": 0,
+                "description": sentence,
+                "description_embedding": openai_client.embeddings.create(
+                    input=[sentence.replace("\n", " ")], model=model
+                )
+                .data[0]
+                .embedding,
+            }
+            knowledge_id += 1
 
         chunk.append(sentence)
-        tokens_so_far += token + 1
+        tokens_so_far += n_token + 1
 
-    return chunks
-
-
-def shorten(df, max_tokens=500):
-    shortened = []
-
-    for row in df.iterrows():
-        if row[1]["text"] is None:
-            continue
-        if row[1]["n_tokens"] > max_tokens:
-            many = split_into_many(row[1]["text"], max_tokens)
-            for m in many:
-                shortened.append(m)
-        else:
-            shortened.append([row[1]["text"][0], row[1]["n_tokens"]])
-
-    df = pd.DataFrame(shortened, columns=["text", "n_tokens"])
-    return df
+    return chunks, knowledge_id
 
 
-def get_embedding(text, client, model="text-embedding-3-small"):
-    text = text.replace("\n", " ")
-    return client.embeddings.create(input=[text], model=model).data[0].embedding
-
-
-def embed(df, csv_path, model="text-embedding-3-small"):
-    client = OpenAI(
+def main(
+    redis_host,
+    redis_port,
+    knowledge_dir,
+    max_tokens,
+    model,
+):
+    knowledge_id = 0
+    r = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
+    c = OpenAI(
         api_key=os.environ.get("OPENAI_API_KEY"),
     )
-    df["embeddings"] = df.text.apply(lambda x: get_embedding(x, client, model=model))
-    df.to_csv(csv_path)
-
-
-def main(knowledge_dir, embedding_csv, max_tokens, model):
-    df = text2df(knowledge_dir)
-    shorten_df = shorten(df, max_tokens)
-    embed(shorten_df, embedding_csv, model)
+    pipeline = r.pipeline()
+    knowledge_loc = find_knowledge_to_embed(r, knowledge_dir)
+    for file_name, file_path in knowledge_loc.items():
+        knowledge_id = break_knowledge(
+            file_name, file_path, knowledge_id, model, c, pipeline, max_tokens
+        )
+    pipeline.execute()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Create embeddings of knowledge")
 
-    parser.add_argument("--knowledge_dir", type=str, help="Directory of the knowledge")
+    parser.add_argument("--redis_host", type=str, default="localhost")
+    parser.add_argument("--redis_port", type=int, default=6379)
 
     parser.add_argument(
-        "--embedding_csv", type=str, help="Absoluate pth to the embedding csv"
+        "--knowledge_dir",
+        type=str,
+        help="Directory of the knowledge",
+        default="/Users/yiping/Projects/pointer_knowledge",
     )
 
     parser.add_argument(
@@ -124,4 +182,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    main(args.knowledge_dir, args.embedding_csv, args.max_tokens, args.model)
+    main(
+        args.redis_host,
+        args.redis_port,
+        args.knowledge_dir,
+        args.max_tokens,
+        args.model,
+    )

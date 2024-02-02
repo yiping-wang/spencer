@@ -1,6 +1,6 @@
 # spencer
 based on https://platform.openai.com/docs/tutorials/web-qa-embeddings
-
+based on https://redis.io/docs/get-started/vector-database/
 # install
 - naviage to this folder
 - `pip install .`
