@@ -1,5 +1,6 @@
 import redis
 from redis.commands.search.indexDefinition import IndexDefinition, IndexType
+from redis.commands.search.query import Query
 from openai import OpenAI
 import tiktoken
 from . import constants
@@ -7,8 +8,6 @@ import numpy as np
 import pandas as pd
 import argparse
 import os
-from redisearch import Client
-from redis.commands.search.query import Query
 
 
 class Searcher:
@@ -23,7 +22,7 @@ class Searcher:
         self.knn = knn
 
         try:
-            Client(constants.INDEX_NAME).info()
+            self.r.ft(constants.INDEX_NAME).info()
         except redis.ResponseError:
             self.create_index()
 

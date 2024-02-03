@@ -9,7 +9,6 @@ setup(
         "tiktoken",
         "pyarrow",
         "redis",
-        "redisearch"
     ],
     # Optional metadata
     author="Yiping Wang",

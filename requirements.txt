@@ -2,4 +2,3 @@ openai
 tiktoken
 pyarrow
 redis
-redisearch
