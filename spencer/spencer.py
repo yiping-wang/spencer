@@ -1,4 +1,4 @@
-from searcher import Searcher
+from .searcher import Searcher
 import uuid
 import redis
 from openai import OpenAI

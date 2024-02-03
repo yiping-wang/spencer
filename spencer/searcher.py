@@ -2,7 +2,7 @@ import redis
 from redis.commands.search.indexDefinition import IndexDefinition, IndexType
 from openai import OpenAI
 import tiktoken
-import constants
+from . import constants
 import numpy as np
 import pandas as pd
 import argparse
