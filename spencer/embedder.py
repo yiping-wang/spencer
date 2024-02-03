@@ -7,8 +7,6 @@ import datetime
 import hashlib
 import re
 import logging
-import sys
-import json
 
 EMBEDDING_DIM = 1536
 logging.basicConfig(
