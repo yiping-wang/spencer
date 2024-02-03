@@ -1,4 +1,4 @@
 from . import answer_question
-from . import create_embedding
+from . import Embedder
 
 __version__ = "0.1.0"
