@@ -26,6 +26,7 @@ class Spencer:
         embedding_model,
         max_context_len,
         max_tokens,
+        knn,
     ):
         self.r = redis_client
         self.o = openai_client
@@ -33,7 +34,7 @@ class Spencer:
         self.em = embedding_model
         self.mcl = max_context_len
         self.mt = max_tokens
-        self.searcher = Searcher(self.r, self.o, self.em, self.mcl)
+        self.searcher = Searcher(self.r, self.o, self.em, self.mcl, knn)
         self.conversion_history = [
             {
                 "role": "system",

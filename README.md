@@ -6,10 +6,10 @@
 - https://hub.docker.com/r/redis/redis-stack-server/
 - First time setup
     - `docker pull redis/redis-stack-server`
-    - `docker run -d --name redis-stack -p 6379:6379 redis/redis-stack-server:latest`
+    - `docker run -d --name redis-stack -p 6379:6379  -v ./redis-data:/data redis/redis-stack-server:latest`
     - `docker stop IMAGE_ID`
 - Next time setup
-    - `docker run -it -p 6379:6379 IMAGE_ID`
+    - `docker run -it -p 6379:6379  -v ./redis-data:/data IMAGE_ID`
     - `docker stop IMAGE_ID`
 
 # openai

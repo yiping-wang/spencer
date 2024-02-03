@@ -7,19 +7,23 @@ import numpy as np
 import pandas as pd
 import argparse
 import os
+from redisearch import Client
+from redis.commands.search.query import Query
 
 
 class Searcher:
-    def __init__(self, redis_client, openai_client, embed_model, max_context_len):
+    def __init__(
+        self, redis_client, openai_client, embed_model, max_context_len, knn=20
+    ):
         self.r = redis_client
         self.o = openai_client
         self.em = embed_model
         self.mcl = max_context_len
         self.t = tiktoken.get_encoding("cl100k_base")
+        self.knn = knn
 
-        # create vector db index
         try:
-            self.r.info()
+            Client(constants.INDEX_NAME).info()
         except redis.ResponseError:
             self.create_index()
 
@@ -41,7 +45,18 @@ class Searcher:
         result_docs = (
             self.r.ft(constants.INDEX_NAME)
             .search(
-                constants.QUERY,
+                Query(f"(*)=>[KNN {self.knn} @vector $query_vector AS vector_score]")
+                .sort_by("vector_score")
+                .return_fields(
+                    "vector_score",
+                    "id",
+                    "file_name",
+                    "file_path",
+                    "last_modified_time",
+                    "n_tokens",
+                    "description",
+                )
+                .dialect(2),
                 {"query_vector": np.array(embedded_query, dtype=np.float32).tobytes()}
                 | extra_params,
             )
