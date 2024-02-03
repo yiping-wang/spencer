@@ -2,12 +2,13 @@ from setuptools import setup, find_packages
 
 setup(
     name="spencer",
-    version="0.1",
+    version="0.2",
     packages=['spencer'],
     install_requires=[
-        "openai==1.10.0",
-        "tiktoken==0.5.2",
-        "pyarrow==15.0.0",
+        "openai",
+        "tiktoken",
+        "pyarrow",
+        "redis"
     ],
     # Optional metadata
     author="Yiping Wang",
