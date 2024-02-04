@@ -6,6 +6,7 @@ from openai import OpenAI
 import datetime
 import hashlib
 import re
+import uuid
 import logging
 
 EMBEDDING_DIM = 1536
@@ -35,7 +36,7 @@ def find_files(dir):
         if ".git" in dirnames:
             dirnames.remove(".git")
         for filename in filenames:
-            if filename == '.DS_Store':
+            if filename == ".DS_Store":
                 continue
             file_path = os.path.join(dirpath, filename)
             all_files.append(file_path)
@@ -48,6 +49,10 @@ def get_file_last_modified_time(fp):
     )
 
 
+def get_first_uuid():
+    return str(uuid.uuid4())[:4]
+
+
 class Embedder:
     def __init__(
         self,
@@ -56,6 +61,7 @@ class Embedder:
         embedding_model,
         knowledge_dir,
         max_tokens,
+        key_prefix,
     ):
         self.r = redis_client
         self.rp = self.r.pipeline()
@@ -63,7 +69,9 @@ class Embedder:
         self.em = embedding_model
         self.k_dir = knowledge_dir
         self.mt = max_tokens
+        self.kp = key_prefix
         self.id = 0
+        self.fid = {}
         self.t = tiktoken.get_encoding("cl100k_base")
 
     def get_file_metadata(self, fn, fp):
@@ -74,13 +82,21 @@ class Embedder:
             "last_modified_time": get_file_last_modified_time(fp),
         }
 
+    def get_file_key(self, fp):
+        return "file:" + fp + ":checksum"
+
+    def remove_file_knowledge(self, id):
+        pattern = f"{self.kp}:{id}:*"
+        for key in self.r.scan_iter(match=pattern):
+            self.r.delete(key)
+
     def find(self):
         """Find the files to embed."""
         loc = {}
         for fp in find_files(self.k_dir):
             fn = os.path.basename(fp)
             checksum = hash_file_sha256(fp)
-            checksum_key = fp + ":checksum"
+            checksum_key = self.get_file_key(fp)
             logging.info(f"checking {fp}")
             prev_checksum = self.r.get(checksum_key)
             if prev_checksum == checksum:
@@ -89,6 +105,9 @@ class Embedder:
             self.r.set(checksum_key, checksum)
             logging.info(f"{fp} is changed or not embedded, and will be embedded")
             loc[fn] = fp
+            if prev_checksum:
+                self.remove_file_knowledge(prev_checksum[:4])
+
         return loc
 
     def split(self, text):
@@ -142,9 +161,10 @@ class Embedder:
         fm = self.get_file_metadata(fn, fp)
         text = remove_newlines(text)
         info_chunks = self.split(text)
+        file_checksum = self.r.get(self.get_file_key(fp))[:4]
         for chunk_id, chunk_info in info_chunks.items():
             data = fm | chunk_info
-            redis_key = f"knowledge:{self.id:05}:{chunk_id:05}"
+            redis_key = f"{self.kp}:{file_checksum}:{chunk_id:05}"
             self.rp.json().set(redis_key, "$", data)
         self.id += 1
 
@@ -192,7 +212,7 @@ if __name__ == "__main__":
         "--knowledge_dir",
         type=str,
         help="Directory of the knowledge",
-        default="/Users/yiping/Projects/pointer_knowledge",
+        default="/Users/yiping/Projects/pointer_knowledge/ca/scotia",
     )
     parser.add_argument(
         "--max_tokens",
@@ -206,11 +226,19 @@ if __name__ == "__main__":
         default="text-embedding-3-small",
         help="Embedding engine from OpenAI",
     )
+    parser.add_argument(
+        "--key_prefix",
+        type=str,
+        default="key",
+        help="Redis key prefix",
+    )
     args = parser.parse_args()
 
     r = redis.Redis(host=args.redis_host, port=args.redis_port, decode_responses=True)
     o = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-    embedder = Embedder(r, o, args.embedding_model, args.knowledge_dir, args.max_tokens)
+    embedder = Embedder(
+        r, o, args.embedding_model, args.knowledge_dir, args.max_tokens, args.key_prefix
+    )
     success = embedder()
     if success:
         logging.info("embedding successfully")
