@@ -1,6 +1,7 @@
 # spencer
-- based on https://platform.openai.com/docs/tutorials/web-qa-embeddings
-- based on https://redis.io/docs/get-started/vector-database/
+spencer is a simple yet get-it-done library that embed any knowledge (e.g., text files) to a searchable database, and allow q&a on the embedded knowledge. 
+
+spencer uses redis as vector database, allowing ultra-fast vector similarity searches and retrieval operations. 
 
 # redis
 - https://hub.docker.com/r/redis/redis-stack-server/
@@ -64,5 +65,9 @@ resp = spencer_client.answer(question_1, adhoc_context="...")
 question_2 = '...'
 resp = spencer_client.answer(question_2, adhoc_context="...")
 ```
+
+# reference
+- based on https://platform.openai.com/docs/tutorials/web-qa-embeddings
+- based on https://redis.io/docs/get-started/vector-database/
 
 
