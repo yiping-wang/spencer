@@ -26,7 +26,7 @@ prepare a folder that contains all the knowledge. this folder can be nested.
 
 ```
 from spencer import Embedder
-r = redis.Redis(host='locahost', port=6379, decode_responses=True)
+r = redis.Redis(host='localhost', port=6379, decode_responses=True)
 o = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 embedder = Embedder(
     r, o, "text-embedding-3-small", knowledge_dir, max_tokens=2000
