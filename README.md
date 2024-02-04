@@ -30,6 +30,8 @@ o = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 embedder = Embedder(
     r, o, "text-embedding-3-small", knowledge_dir, max_tokens=2000
 )
+success = embedder()
+print(success)
 ```
 
 verify whether the knowledge has been embedded or not via `redis-cli`
