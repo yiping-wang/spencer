@@ -197,7 +197,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--max_tokens",
         type=int,
-        default=100,
+        default=200,
         help="Maximum number of tokens to pass the embedding engine",
     )
     parser.add_argument(
