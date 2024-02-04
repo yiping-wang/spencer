@@ -6,12 +6,12 @@ import argparse
 import os
 
 
-def read(file_path):
+def read_f(fp):
     try:
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(fp, "r", encoding="utf-8") as file:
             return file.read()
     except FileNotFoundError:
-        return "The file was not found."
+        return f"{fp} was not found."
     except Exception as e:
         return f"An error occurred: {e}"
 
@@ -41,11 +41,12 @@ class Spencer:
                 "content": system_instruction,
             }
         ]
+        self.id = uuid.UUID()
 
-    def answer(self, question, additional_context=""):
+    def answer(self, question, adhoc_context=""):
         db_context = self.searcher.find(question)
-        if additional_context != "":
-            prompt = f"Context: {db_context}\n\n---\n\n{additional_context}\n\nQuestion: {question}"
+        if adhoc_context != "":
+            prompt = f"Context: {db_context}\n\n---\n\n{adhoc_context}\n\nQuestion: {question}"
         else:
             prompt = f"Context: {db_context}\n\n---\n\nQuestion: {question}"
         self.conversion_history.append(
@@ -54,15 +55,19 @@ class Spencer:
                 "content": prompt,
             }
         )
-        response = self.o.chat.completions.create(
-            model=self.cm,
-            messages=self.conversion_history,
-            temperature=0,
-            max_tokens=self.mt,
-            top_p=1,
-            frequency_penalty=0,
-            presence_penalty=0,
-            stop=None,
+        response = (
+            self.o.chat.completions.create(
+                model=self.cm,
+                messages=self.conversion_history,
+                temperature=0,
+                max_tokens=self.mt,
+                top_p=1,
+                frequency_penalty=0,
+                presence_penalty=0,
+                stop=None,
+            )
+            .choices[0]
+            .message.content
         )
         self.conversion_history.append(
             {
@@ -87,14 +92,13 @@ if __name__ == "__main__":
         "--system_instruction_path",
         type=str,
         default="./system_instruct.txt",
-        help="Question to ask",
+        help="Path to a system instruction file",
     )
     parser.add_argument(
         "--chat_model",
         type=str,
-        # default="gpt-3.5-turbo", # gpt-4-turbo-preview
-        default="gpt-4-turbo-preview",
-        help="Embedding engine from OpenAI",
+        default="gpt-3.5-turbo",
+        help="Chat engine from OpenAI",
     )
     parser.add_argument(
         "--embedding_model",
@@ -112,7 +116,7 @@ if __name__ == "__main__":
         "--max_tokens",
         type=int,
         default=2500,
-        help="Max length of the context",
+        help="Max tokens",
     )
     args = parser.parse_args()
 
@@ -121,7 +125,7 @@ if __name__ == "__main__":
     spencer = Spencer(
         r,
         o,
-        read(args.system_instruction_path),
+        read_f(args.system_instruction_path),
         args.chat_model,
         args.embedding_model,
         args.max_context_len,

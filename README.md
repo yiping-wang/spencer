@@ -4,11 +4,11 @@
 
 # redis
 - https://hub.docker.com/r/redis/redis-stack-server/
-- First time setup
+- 1st time
     - `docker pull redis/redis-stack-server`
     - `docker run -d --name redis-stack -p 6379:6379  -v ./redis-data:/data redis/redis-stack-server:latest`
     - `docker stop IMAGE_ID`
-- Next time setup
+- onwards
     - `docker run -it -p 6379:6379  -v ./redis-data:/data IMAGE_ID`
     - `docker stop IMAGE_ID`
 
@@ -20,8 +20,47 @@
 - `pip install .`
 
 # usage
+## embedding
+prepare a folder that contains all the knowledge. this folder can be nested. 
+
 ```
-import spencer
+from spencer import Embedder
+r = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
+o = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+embedder = Embedder(
+    r, o, "text-embedding-3-small", knowledge_dir, max_tokens=2000
+)
+```
+
+verify whether the knowledge has been embedded or not via `redis-cli`
+
+the knowledge keys are in format `knowledge:doc_id:chunk_id`. 
+
+## spencer
+spencer automatically embed the question, and find the closest `k` knowledge vector and its text. 
+
+spencer uses these `k` texts as context. further, spencer allows `adhoc_context`, meaning you can 
+
+pass context other than the knolwedge we can just embedded. 
+
+```
+r = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
+o = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+spencer_client = Spencer(
+    r,
+    o,
+    system_instruction,
+    chat_model,
+    embedding_model,
+    max_context_len,
+    max_tokens,
+)
+
+question_1 = '...'
+resp = spencer_client.answer(question_1)
+
+question_2 = '...'
+resp = spencer_client.answer(question_2)
+```
 
 
-```

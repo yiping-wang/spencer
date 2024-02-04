@@ -39,14 +39,13 @@ class Embedder:
     def __init__(
         self,
         redis_client,
-        redis_pipeline,
         openai_client,
         embedding_model,
         knowledge_dir,
         max_tokens,
     ):
         self.r = redis_client
-        self.rp = redis_pipeline
+        self.rp = self.r.pipeline()
         self.o = openai_client
         self.em = embedding_model
         self.k_dir = knowledge_dir
@@ -141,7 +140,8 @@ class Embedder:
         for fn, fp in floc.items():
             logging.info(f"embedding {fp}")
             self.break_knowledge(fn, fp)
-        return self.rp.execute()
+        results = self.rp.execute()
+        return sum(results) == len(results)
 
     def _verifier(self, id):
 
@@ -197,15 +197,12 @@ if __name__ == "__main__":
 
     r = redis.Redis(host=args.redis_host, port=args.redis_port, decode_responses=True)
     o = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-    rp = r.pipeline()
-    embedder = Embedder(
-        r, rp, o, args.embedding_model, args.knowledge_dir, args.max_tokens
-    )
-    results = embedder()
-    if sum(results) == len(results):
+    embedder = Embedder(r, o, args.embedding_model, args.knowledge_dir, args.max_tokens)
+    success = embedder()
+    if success:
         logging.info("embedding successfully")
     else:
-        logging.info(f"{len(results) - sum(results)} embedding failed")
+        logging.info("embedding not completed")
 
     # with open("/Users/yiping/Projects/pointer_knowledge/cibc.txt", "r", encoding="UTF-8") as f:
     #     text = f.read()
