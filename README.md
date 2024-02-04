@@ -47,7 +47,7 @@ spencer uses these `k` texts as context. further, spencer allows `adhoc_context`
 pass context other than the knolwedge we can just embedded. 
 
 ```
-r = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
+r = redis.Redis(host='locahost', port=6379, decode_responses=True)
 o = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 spencer_client = Spencer(
     r,
