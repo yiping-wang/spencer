@@ -26,6 +26,7 @@ class Spencer:
         embedding_model,
         max_context_len,
         max_tokens,
+        key_prefix,
         knn,
     ):
         self.r = redis_client
@@ -34,7 +35,8 @@ class Spencer:
         self.em = embedding_model
         self.mcl = max_context_len
         self.mt = max_tokens
-        self.searcher = Searcher(self.r, self.o, self.em, self.mcl, knn)
+        self.kp = key_prefix
+        self.searcher = Searcher(self.r, self.o, self.em, self.mcl, self.kp, knn)
         self.conversion_history = [
             {
                 "role": "system",
@@ -118,6 +120,12 @@ if __name__ == "__main__":
         default=2500,
         help="Max tokens",
     )
+    parser.add_argument(
+        "--key_prefix",
+        type=str,
+        default="key",
+        help="Redis key prefix",
+    )
     args = parser.parse_args()
 
     r = redis.Redis(host=args.redis_host, port=args.redis_port, decode_responses=True)
@@ -130,6 +138,7 @@ if __name__ == "__main__":
         args.embedding_model,
         args.max_context_len,
         args.max_tokens,
+        args.key_prefix,
     )
     print(spencer.answer(args.question))
     print(spencer.conversion_history)

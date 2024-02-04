@@ -12,27 +12,33 @@ import os
 
 class Searcher:
     def __init__(
-        self, redis_client, openai_client, embed_model, max_context_len, knn=20
+        self,
+        redis_client,
+        openai_client,
+        embed_model,
+        max_context_len,
+        key_prefix="key",
+        knn=20,
     ):
         self.r = redis_client
         self.o = openai_client
         self.em = embed_model
         self.mcl = max_context_len
         self.t = tiktoken.get_encoding("cl100k_base")
+        self.kp = key_prefix
         self.knn = knn
+        self.index_name = f"idx:{self.kp}_vss"
 
         try:
-            self.r.ft(constants.INDEX_NAME).info()
+            self.r.ft(self.index_name).info()
         except redis.ResponseError:
             self.create_index()
 
     def create_index(self):
         schema = constants.SCHEMA
-        definition = IndexDefinition(prefix=["knowledge:"], index_type=IndexType.JSON)
-        self.r.ft(constants.INDEX_NAME).create_index(
-            fields=schema, definition=definition
-        )
-        info = self.r.ft(constants.INDEX_NAME).info()
+        definition = IndexDefinition(prefix=[f"{self.kp}:"], index_type=IndexType.JSON)
+        self.r.ft(self.index_name).create_index(fields=schema, definition=definition)
+        info = self.r.ft(self.index_name).info()
         num_docs = info["num_docs"]
         indexing_failures = info["hash_indexing_failures"]
         print(num_docs)
@@ -42,7 +48,7 @@ class Searcher:
         results_list = []
 
         result_docs = (
-            self.r.ft(constants.INDEX_NAME)
+            self.r.ft(self.index_name)
             .search(
                 Query(f"(*)=>[KNN {self.knn} @vector $query_vector AS vector_score]")
                 .sort_by("vector_score")
@@ -118,6 +124,12 @@ if __name__ == "__main__":
         default=500,
         help="Max length of the context",
     )
+    parser.add_argument(
+        "--key_prefix",
+        type=str,
+        default="key",
+        help="Redis key prefix",
+    )
     args = parser.parse_args()
 
     r = redis.Redis(host=args.redis_host, port=args.redis_port, decode_responses=True)
@@ -127,5 +139,6 @@ if __name__ == "__main__":
         o,
         args.embedding_model,
         args.max_context_len,
+        args.key_prefix,
     )
     print(searcher.find(args.question))

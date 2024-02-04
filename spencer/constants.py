@@ -35,4 +35,3 @@ QUERY = (
     )
     .dialect(2)
 )
-INDEX_NAME = "idx:knowledge_vss"

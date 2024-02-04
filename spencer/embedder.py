@@ -61,7 +61,7 @@ class Embedder:
         embedding_model,
         knowledge_dir,
         max_tokens,
-        key_prefix,
+        key_prefix="key",
     ):
         self.r = redis_client
         self.rp = self.r.pipeline()
