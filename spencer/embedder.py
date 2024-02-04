@@ -35,6 +35,8 @@ def find_files(dir):
         if ".git" in dirnames:
             dirnames.remove(".git")
         for filename in filenames:
+            if filename == '.DS_Store':
+                continue
             file_path = os.path.join(dirpath, filename)
             all_files.append(file_path)
     return all_files
