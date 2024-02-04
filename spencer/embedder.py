@@ -29,6 +29,17 @@ def remove_newlines(s):
     return s.strip()
 
 
+def find_files(dir):
+    all_files = []
+    for dirpath, dirnames, filenames in os.walk(dir):
+        if ".git" in dirnames:
+            dirnames.remove(".git")
+        for filename in filenames:
+            file_path = os.path.join(dirpath, filename)
+            all_files.append(file_path)
+    return all_files
+
+
 def get_file_last_modified_time(fp):
     return datetime.datetime.fromtimestamp(os.path.getmtime(fp)).strftime(
         "%Y-%m-%d %H:%M:%S"
@@ -64,8 +75,8 @@ class Embedder:
     def find(self):
         """Find the files to embed."""
         loc = {}
-        for fn in os.listdir(self.k_dir):
-            fp = os.path.join(self.k_dir, fn)
+        for fp in find_files(self.k_dir):
+            fn = os.path.basename(fp)
             checksum = hash_file_sha256(fp)
             checksum_key = fp + ":checksum"
             logging.info(f"checking {fp}")

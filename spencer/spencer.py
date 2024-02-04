@@ -41,7 +41,7 @@ class Spencer:
                 "content": system_instruction,
             }
         ]
-        self.id = uuid.UUID()
+        self.id = str(uuid.uuid4())
 
     def answer(self, question, adhoc_context=""):
         db_context = self.searcher.find(question)
