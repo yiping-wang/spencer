@@ -57,10 +57,10 @@ spencer_client = Spencer(
 )
 
 question_1 = '...'
-resp = spencer_client.answer(question_1)
+resp = spencer_client.answer(question_1, adhoc_context="...")
 
 question_2 = '...'
-resp = spencer_client.answer(question_2)
+resp = spencer_client.answer(question_2, adhoc_context="...")
 ```
 
 
