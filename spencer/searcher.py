@@ -3,7 +3,7 @@ from redis.commands.search.indexDefinition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 from openai import OpenAI
 import tiktoken
-from . import constants
+import constants
 import numpy as np
 import pandas as pd
 import argparse
@@ -55,6 +55,7 @@ class Searcher:
                 .return_fields(
                     "vector_score",
                     "id",
+                    "fid",
                     "file_name",
                     "file_path",
                     "last_modified_time",
@@ -74,6 +75,7 @@ class Searcher:
                     "query": query,
                     "score": vector_score,
                     "id": doc.id,
+                    "fid": doc.fid,
                     "file_name": doc.file_name,
                     "file_path": doc.file_path,
                     "n_tokens": doc.n_tokens,
@@ -88,18 +90,19 @@ class Searcher:
 
     def find(self, question):
         # embedded_question = np.random.randn(constants.VECTOR_DIMENSION)
+        results = {}
         embedded_question = (
             self.o.embeddings.create(input=[question], model=self.em).data[0].embedding
         )
         df = self.create_query_table(question, embedded_question)
-        cur_len, context = 0, []
+        cur_len = 0
         for _, row in df.sort_values("score", ascending=True).iterrows():
             # at least 1 context
-            context.append(row["description"])
+            results[row["fid"]] = row["description"]
             cur_len += int(row["n_tokens"]) + 4
             if cur_len > self.mcl:
                 break
-        return "\n\n###\n\n".join(context)
+        return results
 
 
 if __name__ == "__main__":

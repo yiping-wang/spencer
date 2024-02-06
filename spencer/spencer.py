@@ -45,12 +45,24 @@ class Spencer:
         ]
         self.id = str(uuid.uuid4())
 
+        # knowledge id in the conversion history
+        self.kid_in_ch = set()
+
     def answer(self, question, adhoc_context=""):
-        db_context = self.searcher.find(question)
+        results = self.searcher.find(question)
+        context_list = []
+        for k, v in results.items():
+            if k not in self.kid_in_ch:
+                context_list.append(v)
+                self.kid_in_ch.add(k)
+
+        context = "\n\n###\n\n".join(context_list)
         if adhoc_context != "":
-            prompt = f"Context: {db_context}\n\n---\n\n{adhoc_context}\n\nQuestion: {question}"
+            prompt = (
+                f"Context: {context}\n\n---\n\n{adhoc_context}\n\nQuestion: {question}"
+            )
         else:
-            prompt = f"Context: {db_context}\n\n---\n\nQuestion: {question}"
+            prompt = f"Context: {context}\n\n---\n\nQuestion: {question}"
         self.conversion_history.append(
             {
                 "role": "user",

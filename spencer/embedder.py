@@ -70,13 +70,13 @@ class Embedder:
         self.k_dir = knowledge_dir
         self.mt = max_tokens
         self.kp = key_prefix
-        self.id = 0
         self.fid = {}
         self.t = tiktoken.get_encoding("cl100k_base")
+        self.id = 0
 
-    def get_file_metadata(self, fn, fp):
+    def get_file_metadata(self, fid, fn, fp):
         return {
-            "id": self.id,
+            "fid": fid,
             "file_name": fn,
             "file_path": fp,
             "last_modified_time": get_file_last_modified_time(fp),
@@ -113,10 +113,10 @@ class Embedder:
     def split(self, text):
 
         # create metadata for each chunk
-        def _info(self, s, cid):
-            return {
+        def _info(self, s):
+            i = {
+                "id": self.id,
                 "n_tokens": len(self.t.encode(s)),
-                "chunk_id": cid,
                 "description": s,
                 "embedding": self.o.embeddings.create(
                     input=[s.replace("\n", " ")], model=self.em
@@ -124,6 +124,8 @@ class Embedder:
                 .data[0]
                 .embedding,
             }
+            self.id += 1
+            return i
 
         sentences = text.split(". ")
         n_tokens = [len(self.t.encode(" " + sentence)) for sentence in sentences]
@@ -141,7 +143,7 @@ class Embedder:
             if tokens_so_far + n_token > self.mt:
                 sub_sentence = ". ".join(chunk) + "."
                 chunk, tokens_so_far = [], 0
-                chunks[chunk_id] = _info(self, sub_sentence, chunk_id)
+                chunks[chunk_id] = _info(self, sub_sentence)
                 chunk_id += 1
 
             # continue to accumulate chunks
@@ -150,7 +152,7 @@ class Embedder:
 
         # remaining
         sub_sentence = ". ".join(chunk) + "."
-        chunks[chunk_id] = _info(self, sub_sentence, chunk_id)
+        chunks[chunk_id] = _info(self, sub_sentence)
 
         return chunks
 
@@ -158,15 +160,13 @@ class Embedder:
         fn = fn.replace("-", " ").replace("_", " ").replace("#update", "")
         with open(fp, "r", encoding="UTF-8") as f:
             text = f.read()
-        fm = self.get_file_metadata(fn, fp)
         text = remove_newlines(text)
         info_chunks = self.split(text)
         file_checksum = self.r.get(self.get_file_key(fp))[:4]
         for chunk_id, chunk_info in info_chunks.items():
-            data = fm | chunk_info
-            redis_key = f"{self.kp}:{file_checksum}:{chunk_id:05}"
-            self.rp.json().set(redis_key, "$", data)
-        self.id += 1
+            id = f"{self.kp}:{file_checksum}:{chunk_id:05}"
+            data = self.get_file_metadata(id, fn, fp) | chunk_info
+            self.rp.json().set(id, "$", data)
 
     def __call__(self):
         floc = self.find()
