@@ -135,7 +135,7 @@ class Embedder:
 
             # a sentence is larger than max tokens
             if n_token > self.mt:
-                chunks[chunk_id] = _info(self, sentence, chunk_id)
+                chunks[chunk_id] = _info(self, sentence)
                 chunk_id += 1
                 continue
 
